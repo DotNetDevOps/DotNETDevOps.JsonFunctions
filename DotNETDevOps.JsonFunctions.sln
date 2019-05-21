@@ -13,7 +13,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotNETDevOps.JsonFunctions.
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "functions", "functions", "{01A8C07A-2763-4F74-8F25-B9AEC7D290F0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotNETDevOps.JsonFunctions.EvaluatorFunction", "functions\DotNETDevOps.JsonFunctions.EvaluatorFunction\DotNETDevOps.JsonFunctions.EvaluatorFunction.csproj", "{6FAB068C-ACF7-4B28-9F9E-409387507F35}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DotNETDevOps.JsonFunctions.EvaluatorFunction", "functions\DotNETDevOps.JsonFunctions.EvaluatorFunction\DotNETDevOps.JsonFunctions.EvaluatorFunction.csproj", "{6FAB068C-ACF7-4B28-9F9E-409387507F35}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{299EAF72-61B8-4A57-BA99-B00DA577DE95}"
+	ProjectSection(SolutionItems) = preProject
+		azure-pipelines.yml = azure-pipelines.yml
+		global.json = global.json
+		nuget.config = nuget.config
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

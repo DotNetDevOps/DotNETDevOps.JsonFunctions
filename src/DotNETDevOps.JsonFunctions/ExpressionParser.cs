@@ -3,118 +3,10 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using Sprache;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace DotNETDevOps.JsonFunctions
 {
-    public interface IJTokenEvaluator
-    {
-        JToken Evaluate();
-    }
-    internal class ObjectLookup : IJTokenEvaluator
-    {
-        public string propertyName;
-        private readonly bool throwOnError;
-
-        public ObjectLookup(string propertyName, bool throwOnError)
-        {
-            this.propertyName = propertyName;
-            this.throwOnError = throwOnError;
-        }
-
-        public IJTokenEvaluator Object { get; internal set; }
-
-        public JToken Evaluate()
-        {
-            var token = Object.Evaluate();
-            if(token is JObject jobject)
-                return jobject[propertyName];
-
-            if (throwOnError)
-                throw new Exception("Cant look up property on none object");
-
-            return $"{token.ToString()}.{propertyName}";
-        }
-    }
-
-    public class StringConstantEvaluator : IJTokenEvaluator
-    {
-        private string text;
-
-        public StringConstantEvaluator(string text)
-        {
-            this.text = text;
-        }
-
-        public JToken Evaluate()
-        {
-            return text;
-        }
-    }
-    public class DecimalConstantEvaluator : IJTokenEvaluator
-    {
-        private decimal @decimal;
-
-        public DecimalConstantEvaluator(decimal @decimal)
-        {
-            this.@decimal = @decimal;
-        }
-
-        public JToken Evaluate()
-        {
-            return JToken.FromObject(@decimal);
-        }
-    }
-    public class ConstantEvaluator : IJTokenEvaluator
-    {
-        private string k;
-
-        public ConstantEvaluator(string k)
-        {
-            this.k = k;
-        }
-
-        public JToken Evaluate()
-        {
-            return JToken.Parse(k);
-        }
-    }
-    public class ArrayIndexLookup : IJTokenEvaluator
-    {
-        public string parsedText;
-
-        public ArrayIndexLookup(string parsedText)
-        {
-            this.parsedText = parsedText;
-        }
-
-        public IJTokenEvaluator ArrayEvaluator { get; set; }
-
-        public JToken Evaluate()
-        {
-            return ArrayEvaluator.Evaluate()[int.Parse(parsedText)];
-        }
-    }
-    public interface IExpressionFunctionFactory
-    {
-        ExpressionParser.ExpressionFunction Get(string name);
-    }
-    public class DefaultExpressionFunctionFactory : IExpressionFunctionFactory
-    {
-       
-        public Dictionary<string, ExpressionParser.ExpressionFunction> Functions { get; set; } = new Dictionary<string, ExpressionParser.ExpressionFunction>();
-
-        public ExpressionParser.ExpressionFunction Get(string name)
-        {
-            return Functions[name];
-        }
-    }
-    public class ExpressionParserOptions
-    {
-        public bool ThrowOnError { get; set; } = true;
-        public JToken Document { get; set; }
-    }
     public class ExpressionParser
     {
 
@@ -283,24 +175,5 @@ namespace DotNETDevOps.JsonFunctions
 
             return null;
         }
-    }
-    public class FunctionEvaluator : IJTokenEvaluator
-    {
-        private string name;
-        private IJTokenEvaluator[] parameters;
-        private ExpressionParser evaluator;
-        public FunctionEvaluator(ExpressionParser evaluator, string name, IJTokenEvaluator[] parameters)
-        {
-            this.name = name;
-            this.parameters = parameters;
-            this.evaluator = evaluator;
-        }
-
-        public JToken Evaluate()
-        {
-            return evaluator.Evaluate(name, parameters.Select(p => p.Evaluate()).ToArray());
-        }
-
-
     }
 }
