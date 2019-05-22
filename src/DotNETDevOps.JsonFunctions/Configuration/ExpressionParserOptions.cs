@@ -2,9 +2,9 @@
 
 namespace DotNETDevOps.JsonFunctions
 {
-    public class ExpressionParserOptions
+    public class ExpressionParserOptions<TContext>
     {
         public bool ThrowOnError { get; set; } = true;
-        public JToken Document { get; set; }
+        public TContext Document { get; set; }
     }
 }

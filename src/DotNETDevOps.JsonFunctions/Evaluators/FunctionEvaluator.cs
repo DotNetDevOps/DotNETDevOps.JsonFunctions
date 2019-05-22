@@ -7,8 +7,8 @@ namespace DotNETDevOps.JsonFunctions
     {
         private string name;
         private IJTokenEvaluator[] parameters;
-        private ExpressionParser evaluator;
-        public FunctionEvaluator(ExpressionParser evaluator, string name, IJTokenEvaluator[] parameters)
+        private IExpressionParser evaluator;
+        public FunctionEvaluator(IExpressionParser evaluator, string name, IJTokenEvaluator[] parameters)
         {
             this.name = name;
             this.parameters = parameters;

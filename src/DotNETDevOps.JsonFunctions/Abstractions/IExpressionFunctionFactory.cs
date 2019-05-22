@@ -1,7 +1,7 @@
 ﻿namespace DotNETDevOps.JsonFunctions
 {
-    public interface IExpressionFunctionFactory
+    public interface IExpressionFunctionFactory<TContext>
     {
-        ExpressionParser.ExpressionFunction Get(string name);
+        ExpressionParser<TContext>.ExpressionFunction Get(string name);
     }
 }

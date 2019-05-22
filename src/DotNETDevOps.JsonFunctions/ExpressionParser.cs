@@ -7,10 +7,14 @@ using System.Linq;
 
 namespace DotNETDevOps.JsonFunctions
 {
-    public class ExpressionParser
+    public interface IExpressionParser
+    {
+        JToken Evaluate(string name, params JToken[] arguments);
+    }
+    public class ExpressionParser<TContext> : IExpressionParser
     {
 
-        public delegate JToken ExpressionFunction(JToken document, JToken[] arguments);
+        public delegate JToken ExpressionFunction(TContext document, JToken[] arguments);
 
         public readonly Parser<IJTokenEvaluator> Function;
         public readonly Parser<IJTokenEvaluator> Constant;
@@ -50,14 +54,14 @@ namespace DotNETDevOps.JsonFunctions
                                                            from num in Parse.Decimal
                                                            from trailingSpaces in Parse.Char(' ').Many()
                                                            select new DecimalConstantEvaluator(decimal.Parse(num) * (op.IsDefined ? -1 : 1));
-        private readonly IOptions<ExpressionParserOptions> options;
+        private readonly IOptions<ExpressionParserOptions<TContext>> options;
         private readonly ILogger logger;
-        private readonly IExpressionFunctionFactory functions;
+        private readonly IExpressionFunctionFactory<TContext> functions;
 
-        public JToken Document => this.options.Value.Document;
+        public TContext Document => this.options.Value.Document;
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
-        public ExpressionParser(IOptions<ExpressionParserOptions> options, ILogger logger, IExpressionFunctionFactory functions)
+        public ExpressionParser(IOptions<ExpressionParserOptions<TContext>> options, ILogger logger, IExpressionFunctionFactory<TContext> functions)
         {
             Constant = Parse.LetterOrDigit.AtLeastOnce().Text().Select(k => new ConstantEvaluator(k));
 
