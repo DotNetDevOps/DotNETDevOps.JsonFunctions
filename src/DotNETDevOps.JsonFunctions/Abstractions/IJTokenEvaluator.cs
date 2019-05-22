@@ -1,9 +1,10 @@
 ﻿using Newtonsoft.Json.Linq;
+using System.Threading.Tasks;
 
 namespace DotNETDevOps.JsonFunctions
 {
     public interface IJTokenEvaluator
     {
-        JToken Evaluate();
+        Task<JToken> EvaluateAsync();
     }
 }

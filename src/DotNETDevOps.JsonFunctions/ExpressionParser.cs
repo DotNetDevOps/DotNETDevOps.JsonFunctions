@@ -4,17 +4,18 @@ using Newtonsoft.Json.Linq;
 using Sprache;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace DotNETDevOps.JsonFunctions
 {
     public interface IExpressionParser
     {
-        JToken Evaluate(string name, params JToken[] arguments);
+        Task<JToken> EvaluateAsync(string name, params JToken[] arguments);
     }
     public class ExpressionParser<TContext> : IExpressionParser
     {
 
-        public delegate JToken ExpressionFunction(TContext document, JToken[] arguments);
+        public delegate Task<JToken> ExpressionFunction(TContext document, JToken[] arguments);
 
         public readonly Parser<IJTokenEvaluator> Function;
         public readonly Parser<IJTokenEvaluator> Constant;
@@ -113,7 +114,7 @@ namespace DotNETDevOps.JsonFunctions
 
         }
 
-        public JToken Evaluate(string name, params JToken[] arguments)
+        public async Task<JToken> EvaluateAsync(string name, params JToken[] arguments)
         {
             var function = functions.Get(name);
             if(function == null)
@@ -122,7 +123,7 @@ namespace DotNETDevOps.JsonFunctions
             }
            
 
-            var value =function(Document, arguments);
+            var value =await function(Document, arguments);
 
 
             return value;
@@ -133,15 +134,15 @@ namespace DotNETDevOps.JsonFunctions
             return new FunctionEvaluator(this, name, parameters);
         }
 
-        public JToken Evaluate(string str)
+        public async Task<JToken> EvaluateAsync(string str)
         {
-            var value = EvaluateImp(str);
+            var value = await EvaluateImp(str);
             logger.LogInformation("Evaluating '{str}' to '{value}'", str, value.ToString());
             return value;
 
         }
 
-        private JToken EvaluateImp(string str)
+        private async Task<JToken> EvaluateImp(string str)
         {
             Parser<IJTokenEvaluator[]> stringParser =
                  from first in Parse.Char('[')
@@ -153,13 +154,13 @@ namespace DotNETDevOps.JsonFunctions
 
             var func = stringParser.Parse(str).ToArray();
             if (func.Length == 1)
-                return func.First().Evaluate();
+                return await func.First().EvaluateAsync();
 
             for (var i = 0; i < func.Length; i++)
             {
                 if (func[i] is ArrayIndexLookup array)
                 {
-                    var arrayToken = func[i - 1].Evaluate();
+                    var arrayToken = await func[i - 1].EvaluateAsync();
                     if (arrayToken.Type != JTokenType.Array)
                         throw new Exception("not an array");
 
@@ -168,7 +169,7 @@ namespace DotNETDevOps.JsonFunctions
                 }
                 else if (func[i] is ObjectLookup objectLookup)
                 {
-                    var arrayToken = func[i - 1].Evaluate();
+                    var arrayToken = await func[i - 1].EvaluateAsync();
                     if (arrayToken.Type != JTokenType.Object)
                         throw new Exception("not an object");
 

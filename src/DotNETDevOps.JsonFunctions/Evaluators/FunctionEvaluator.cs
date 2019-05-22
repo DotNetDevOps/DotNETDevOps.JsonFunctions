@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace DotNETDevOps.JsonFunctions
 {
@@ -15,9 +16,9 @@ namespace DotNETDevOps.JsonFunctions
             this.evaluator = evaluator;
         }
 
-        public JToken Evaluate()
+        public async Task<JToken> EvaluateAsync()
         {
-            return evaluator.Evaluate(name, parameters.Select(p => p.Evaluate()).ToArray());
+            return await evaluator.EvaluateAsync(name, await Task.WhenAll(parameters.Select(p => p.EvaluateAsync())));
         }
 
 

@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json.Linq;
+using System.Threading.Tasks;
 
 namespace DotNETDevOps.JsonFunctions
 {
@@ -11,9 +12,9 @@ namespace DotNETDevOps.JsonFunctions
             this.@decimal = @decimal;
         }
 
-        public JToken Evaluate()
+        public Task<JToken> EvaluateAsync()
         {
-            return JToken.FromObject(@decimal);
+            return Task.FromResult(JToken.FromObject(@decimal));
         }
     }
 }
