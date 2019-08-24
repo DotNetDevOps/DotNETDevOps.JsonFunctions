@@ -21,6 +21,7 @@ namespace DotNETDevOps.JsonFunctions
         public readonly Parser<IJTokenEvaluator> Constant;
         public readonly Parser<IJTokenEvaluator> ArrayIndexer;
         public readonly Parser<IJTokenEvaluator> PropertyAccess;
+        public readonly Parser<IJTokenEvaluator> ObjectFunction;        
         public readonly Parser<IJTokenEvaluator[]> Tokenizer;
 
         private static readonly Parser<char> DoubleQuote = Parse.Char('"');
@@ -66,7 +67,7 @@ namespace DotNETDevOps.JsonFunctions
         {
             Constant = Parse.LetterOrDigit.AtLeastOnce().Text().Select(k => new ConstantEvaluator(k));
 
-            Tokenizer = from expr in Parse.Ref(() => Parse.Ref(() => (Function.Or(Number).Or(QuotedString).Or(QuotedSingleString).Or(Constant)).Or(ArrayIndexer).Or(PropertyAccess)).AtLeastOnce()).Optional().DelimitedBy(Parse.Char(',').Token())
+            Tokenizer = from expr in Parse.Ref(() => Parse.Ref(() => (Function.Or(Number).Or(QuotedString).Or(QuotedSingleString).Or(Constant)).Or(ArrayIndexer).Or(ObjectFunction).Or(PropertyAccess)).AtLeastOnce()).Optional().DelimitedBy(Parse.Char(',').Token())
                         select FixArrayIndexers(expr.Select(c => (c.GetOrDefault() ?? Enumerable.Empty<IJTokenEvaluator>()).ToArray()).ToArray());
 
             Function = from name in Parse.Letter.AtLeastOnce().Text()
@@ -78,6 +79,13 @@ namespace DotNETDevOps.JsonFunctions
             PropertyAccess = from first in Parse.Char('.')
                              from propertyName in Parse.LetterOrDigit.AtLeastOnce().Text()
                              select new ObjectLookup(propertyName,options.Value.ThrowOnError);
+
+            ObjectFunction = from first in Parse.Char('.')
+                                 from name in Parse.LetterOrDigit.AtLeastOnce().Text()
+                                 from lparen in Parse.Char('(')
+                                 from expr in Tokenizer
+                                 from rparen in Parse.Char(')')
+                                 select CallFunction(name, expr);
 
             ArrayIndexer = from first in Parse.Char('[')
                            from text in Parse.Number
@@ -108,6 +116,20 @@ namespace DotNETDevOps.JsonFunctions
             {
                 lookup.Object = c[0];
                 return lookup;
+            }
+
+           
+            if (c.Length > 1 && c.All(a=>a is FunctionEvaluator))
+            {
+                var functions = c.Cast<FunctionEvaluator>().ToArray();
+                
+                for (var j = functions.Length - 1; j > 0; j--)
+                {
+                    functions[j].Object = functions[j - 1];
+
+
+                 }
+                return functions.Last();
             }
 
             return null;

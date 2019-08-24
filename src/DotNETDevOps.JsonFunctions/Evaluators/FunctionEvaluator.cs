@@ -18,9 +18,12 @@ namespace DotNETDevOps.JsonFunctions
 
         public async Task<JToken> EvaluateAsync()
         {
+            if(Object!=null)
+                return await evaluator.EvaluateAsync(name, await Task.WhenAll(new[] { Object.EvaluateAsync() }.Concat(parameters.Select(p => p.EvaluateAsync()))));
+
             return await evaluator.EvaluateAsync(name, await Task.WhenAll(parameters.Select(p => p.EvaluateAsync())));
         }
 
-
+        public IJTokenEvaluator Object { get; internal set; }
     }
 }

@@ -24,7 +24,7 @@ namespace DotNETDevOps.JsonFunctions.EvaluatorFunction
             this.consolePrintExpressionFunctionFactory = consolePrintExpressionFunctionFactory;
             this.name = name ?? throw new ArgumentNullException(nameof(name));
         }
-        public JToken PrintFunction(JToken document, JToken[] arguments)
+        public Task<JToken> PrintFunction(JToken document, JToken[] arguments)
         {
             if (name == "parameters")
             {
@@ -38,7 +38,7 @@ namespace DotNETDevOps.JsonFunctions.EvaluatorFunction
 
             consolePrintExpressionFunctionFactory.FoundFunctions.Add(name);
 
-            return $"{name}({string.Join(',', arguments.Select(k => ToString(k)))})";
+            return Task.FromResult((JToken)$"{name}({string.Join(',', arguments.Select(k => ToString(k)))})");
         }
 
         private string ToString(JToken k)
@@ -48,12 +48,12 @@ namespace DotNETDevOps.JsonFunctions.EvaluatorFunction
             return k.ToString();
         }
     }
-    public class ConsolePrintExpressionFunctionFactory : IExpressionFunctionFactory
+    public class ConsolePrintExpressionFunctionFactory : IExpressionFunctionFactory<JToken>
     {
         public HashSet<string> FoundFunctions = new HashSet<string>();
         public HashSet<string> Parameters = new HashSet<string>();
 
-        public ExpressionParser.ExpressionFunction Get(string name)
+        public ExpressionParser<JToken>.ExpressionFunction Get(string name)
         {
 
             return new ConsolePrintExpressionFunction(this, name).PrintFunction;
@@ -75,31 +75,31 @@ namespace DotNETDevOps.JsonFunctions.EvaluatorFunction
             var document = JToken.Parse(requestBody);
             
                 var factory = new ConsolePrintExpressionFunctionFactory();
-                var ex = new ExpressionParser(Options.Create(new ExpressionParserOptions { ThrowOnError = false, Document = document }), log, factory);
+                var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken> { ThrowOnError = false, Document = document }), log, factory);
 
             Recursive(ex, document);
 
             return new OkObjectResult(new { parameters = factory.Parameters, functions = factory.FoundFunctions });
         }
-        private void Recursive(ExpressionParser ex, JToken document)
+        private async Task Recursive(ExpressionParser<JToken> ex, JToken document)
         {
             if (document is JObject jobject)
             {
                 foreach (var prop in jobject.Properties())
                 {
-                    Recursive(ex, prop.Value);
+                    await Recursive(ex, prop.Value);
                 }
             }
             else if (document is JArray jarray)
             {
                 foreach (var value in jarray)
                 {
-                    Recursive(ex, value);
+                    await Recursive(ex, value);
                 }
             }
             else if (document.Type == JTokenType.String && document.ToString().StartsWith("["))
             {
-                var token = ex.Evaluate(document.ToString());
+                var token =await  ex.EvaluateAsync(document.ToString());
 
 
 
@@ -107,7 +107,7 @@ namespace DotNETDevOps.JsonFunctions.EvaluatorFunction
                 {
                     document.Replace(token);
 
-                    Recursive(ex, token);
+                    await Recursive(ex, token);
                 }
 
             }
