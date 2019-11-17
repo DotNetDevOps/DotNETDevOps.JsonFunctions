@@ -11,7 +11,7 @@ namespace DotNETDevOps.JsonFunctions
 
         public ObjectLookup(string propertyName, bool throwOnError)
         {
-            this.propertyName = propertyName;
+            this.propertyName = propertyName.Trim('\'');
             this.throwOnError = throwOnError;
         }
 

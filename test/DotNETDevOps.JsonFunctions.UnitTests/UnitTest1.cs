@@ -69,6 +69,27 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             Console.WriteLine(formatter(state, exception));
         }
     }
+    public class MyFac : DefaultExpressionFunctionFactory<JToken>
+    {
+        private readonly JToken payload;
+
+        public MyFac(JToken Payload)
+        {
+            Functions["variables"] = GetVariable;
+            Functions["payload"] = GetPayload;
+            payload = Payload;
+        }
+
+        private Task<JToken> GetPayload(JToken document, JToken[] arguments)
+        {
+            return Task.FromResult(payload);
+        }
+
+        private Task<JToken> GetVariable(JToken document, JToken[] arguments)
+        {
+            return Task.FromResult(document.SelectToken($"$.variables.{arguments.First().ToString()}"));
+        }
+    }
     public class UnitTest1
     {
         [Fact]
@@ -83,6 +104,19 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             var test = await ex.EvaluateAsync("[CorsPolicyBuilder().AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()]");
             var cprs = ex.Document.Build();
 
+        }
+        [Fact]
+        public async Task Test2()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+                Document= JToken.FromObject(new { variables = new { test = new { helloWorld="b"} } } )
+            }), new log(),new MyFac("helloWorld"));
+
+            var test = await ex.EvaluateAsync("[variables('test')[payload()]]");
+
+            Assert.Equal("b", test.ToString());
         }
     }
 }

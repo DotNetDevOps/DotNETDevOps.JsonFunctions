@@ -12,6 +12,36 @@ namespace DotNETDevOps.JsonFunctions
     {
         Task<JToken> EvaluateAsync(string name, params JToken[] arguments);
     }
+
+    internal class ChildExpressionParser<TContext> : IJTokenEvaluator
+    {
+        private readonly IJTokenEvaluator[] childs;
+        private readonly bool throwOnError;
+
+        public ChildExpressionParser (IJTokenEvaluator[] childs, bool throwOnError)
+        {
+            this.childs = childs;
+            this.throwOnError = throwOnError;
+        }
+
+        public IJTokenEvaluator Object { get; internal set; }
+
+        public async Task<JToken> EvaluateAsync()
+        {
+            var propertyName = await childs[0].EvaluateAsync();
+
+            var token = await Object.EvaluateAsync();
+            if (token is JObject jobject)
+                return jobject[propertyName.ToString()];
+
+            if (throwOnError)
+                throw new Exception("Cant look up property on none object");
+
+            return $"{token.ToString()}.{propertyName}";
+
+             
+        }
+    }
     public class ExpressionParser<TContext> : IExpressionParser
     {
 
@@ -20,7 +50,10 @@ namespace DotNETDevOps.JsonFunctions
         public readonly Parser<IJTokenEvaluator> Function;
         public readonly Parser<IJTokenEvaluator> Constant;
         public readonly Parser<IJTokenEvaluator> ArrayIndexer;
-        public readonly Parser<IJTokenEvaluator> PropertyAccess;
+        public readonly Parser<IJTokenEvaluator> PropertyAccessByDot;
+        public readonly Parser<IJTokenEvaluator> PropertyAccessByBracket;
+        public readonly Parser<IJTokenEvaluator> ChildAccessByBracket;
+        
         public readonly Parser<IJTokenEvaluator> ObjectFunction;        
         public readonly Parser<IJTokenEvaluator[]> Tokenizer;
 
@@ -67,7 +100,7 @@ namespace DotNETDevOps.JsonFunctions
         {
             Constant = Parse.LetterOrDigit.AtLeastOnce().Text().Select(k => new ConstantEvaluator(k));
 
-            Tokenizer = from expr in Parse.Ref(() => Parse.Ref(() => (Function.Or(Number).Or(QuotedString).Or(QuotedSingleString).Or(Constant)).Or(ArrayIndexer).Or(ObjectFunction).Or(PropertyAccess)).AtLeastOnce()).Optional().DelimitedBy(Parse.Char(',').Token())
+            Tokenizer = from expr in Parse.Ref(() => Parse.Ref(() => (Function.Or(Number).Or(QuotedString).Or(QuotedSingleString).Or(Constant)).Or(ArrayIndexer).Or(ObjectFunction).Or(PropertyAccessByDot).Or(PropertyAccessByBracket).Or(ChildAccessByBracket)).AtLeastOnce()).Optional().DelimitedBy(Parse.Char(',').Token())
                         select FixArrayIndexers(expr.Select(c => (c.GetOrDefault() ?? Enumerable.Empty<IJTokenEvaluator>()).ToArray()).ToArray());
 
             Function = from name in Parse.Letter.AtLeastOnce().Text()
@@ -76,9 +109,19 @@ namespace DotNETDevOps.JsonFunctions
                        from rparen in Parse.Char(')')
                        select CallFunction(name, expr);
 
-            PropertyAccess = from first in Parse.Char('.')
+            PropertyAccessByDot = from first in Parse.Char('.')
                              from propertyName in Parse.LetterOrDigit.AtLeastOnce().Text()
                              select new ObjectLookup(propertyName,options.Value.ThrowOnError);
+            PropertyAccessByBracket = from first in Parse.Char('[')
+                                      from propertyName in (Parse.LetterOrDigit.Or(Parse.Char('\'')).AtLeastOnce().Text())
+                                      from last in Parse.Char(']')
+                                      select new ObjectLookup(propertyName, options.Value.ThrowOnError);
+
+            ChildAccessByBracket = from first in Parse.Char('[')
+                                   from propertyName in Tokenizer
+                                   from last in Parse.Char(']')
+                                   select new ChildExpressionParser<TContext>(propertyName, options.Value.ThrowOnError);
+
 
             ObjectFunction = from first in Parse.Char('.')
                                  from name in Parse.LetterOrDigit.AtLeastOnce().Text()
@@ -117,8 +160,13 @@ namespace DotNETDevOps.JsonFunctions
                 lookup.Object = c[0];
                 return lookup;
             }
+            if (c.Length == 2 && c[1] is ChildExpressionParser<TContext> childContext)
+            {
+               childContext.Object = c[0];
+                return childContext;
+            }
 
-           
+
             if (c.Length > 1 && c.All(a=>a is FunctionEvaluator))
             {
                 var functions = c.Cast<FunctionEvaluator>().ToArray();
@@ -159,7 +207,7 @@ namespace DotNETDevOps.JsonFunctions
         public async Task<JToken> EvaluateAsync(string str)
         {
             var value = await EvaluateImp(str);
-            logger.LogInformation("Evaluating '{str}' to '{value}'", str, value.ToString());
+            logger.LogInformation("Evaluating '{str}' to '{value}'", str, value?.ToString());
             return value;
 
         }
