@@ -29,24 +29,24 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
                     throw new NotImplementedException();
             }
         }
-        public Task<JToken> CorsPolicyBuilder(CorsPolicyBuilder document, JToken[] args)
+        public Task<JToken> CorsPolicyBuilder(ExpressionParser<CorsPolicyBuilder> parser, CorsPolicyBuilder document, JToken[] args)
         {
            // document.AddPolicy(document.DefaultPolicyName,new CorsPolicy());
 
             return Task.FromResult(JToken.FromObject(new { }));
         }
-        public Task<JToken> AllowAnyOrigin(CorsPolicyBuilder document, JToken[] args)
+        public Task<JToken> AllowAnyOrigin(ExpressionParser<CorsPolicyBuilder> parser, CorsPolicyBuilder document, JToken[] args)
         {
             document.AllowAnyOrigin();
 
             return Task.FromResult(JToken.FromObject(new { }));
         }
-        public Task<JToken> AllowAnyMethod(CorsPolicyBuilder document, JToken[] args)
+        public Task<JToken> AllowAnyMethod(ExpressionParser<CorsPolicyBuilder> parser, CorsPolicyBuilder document, JToken[] args)
         {
             document.AllowAnyMethod();
             return Task.FromResult(JToken.FromObject(new { }));
         }
-        public Task<JToken> AllowAnyHeader(CorsPolicyBuilder document, JToken[] args)
+        public Task<JToken> AllowAnyHeader(ExpressionParser<CorsPolicyBuilder> parser, CorsPolicyBuilder document, JToken[] args)
         {
             document.AllowAnyHeader();
             return Task.FromResult(JToken.FromObject(new { }));
@@ -80,12 +80,12 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             payload = Payload;
         }
 
-        private Task<JToken> GetPayload(JToken document, JToken[] arguments)
+        private Task<JToken> GetPayload(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
         {
             return Task.FromResult(payload);
         }
 
-        private Task<JToken> GetVariable(JToken document, JToken[] arguments)
+        private Task<JToken> GetVariable(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
         {
             return Task.FromResult(document.SelectToken($"$.variables.{arguments.First().ToString()}"));
         }
@@ -111,7 +111,7 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
             {
                 ThrowOnError = false,
-                Document= JToken.FromObject(new { variables = new { test = new { helloWorld="b"} } } )
+                Document= JToken.FromObject(new { variables = new { test = new { helloWorld = "b" } } }),
             }), new log(),new MyFac("helloWorld"));
 
             var test = await ex.EvaluateAsync("[variables('test')[payload()]]");

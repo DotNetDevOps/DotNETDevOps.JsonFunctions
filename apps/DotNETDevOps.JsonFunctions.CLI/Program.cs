@@ -24,7 +24,7 @@ namespace DotNETDevOps.JsonFunctions.CLI
             this.consolePrintExpressionFunctionFactory = consolePrintExpressionFunctionFactory;
             this.name = name ?? throw new ArgumentNullException(nameof(name));
         }
-        public Task<JToken> PrintFunction(JToken document, JToken[] arguments)
+        public Task<JToken> PrintFunction(ExpressionParser<JToken> parser,JToken document, JToken[] arguments)
         {
             if (name == "parameters")
             {

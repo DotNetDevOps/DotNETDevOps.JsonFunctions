@@ -45,7 +45,7 @@ namespace DotNETDevOps.JsonFunctions
     public class ExpressionParser<TContext> : IExpressionParser
     {
 
-        public delegate Task<JToken> ExpressionFunction(TContext document, JToken[] arguments);
+        public delegate Task<JToken> ExpressionFunction(ExpressionParser<TContext> parser, TContext document, JToken[] arguments);
 
         public readonly Parser<IJTokenEvaluator> Function;
         public readonly Parser<IJTokenEvaluator> Constant;
@@ -193,7 +193,7 @@ namespace DotNETDevOps.JsonFunctions
             }
            
 
-            var value =await function(Document, arguments);
+            var value =await function(this,Document, arguments);
 
 
             return value;
