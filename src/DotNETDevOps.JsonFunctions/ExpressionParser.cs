@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using Sprache;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -206,9 +207,19 @@ namespace DotNETDevOps.JsonFunctions
 
         public async Task<JToken> EvaluateAsync(string str)
         {
-            var value = await EvaluateImp(str);
-            logger.LogInformation("Evaluating '{str}' to '{value}'", str, value?.ToString());
-            return value;
+            using (logger.BeginScope(new Dictionary<string, string> { ["expression"] = str }))
+            {
+                try
+                {
+                    var value = await EvaluateImp(str);
+                    logger.LogTrace("Evaluating '{str}' to '{value}'", str, value?.ToString());
+                    return value;
+                }catch(Exception ex)
+                {
+                    logger.LogError(ex, "Failed to evaluate expression");
+                    throw;
+                }
+            }
 
         }
 
