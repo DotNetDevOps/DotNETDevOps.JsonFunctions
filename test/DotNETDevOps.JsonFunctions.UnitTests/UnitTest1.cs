@@ -52,11 +52,16 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             return Task.FromResult(JToken.FromObject(new { }));
         }
     }
-    public class log : ILogger
+    public class log : ILogger, IDisposable
     {
         public IDisposable BeginScope<TState>(TState state)
         {
-            throw new NotImplementedException();
+            return this;
+        }
+
+        public void Dispose()
+        {
+           
         }
 
         public bool IsEnabled(LogLevel logLevel)
@@ -69,15 +74,21 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             Console.WriteLine(formatter(state, exception));
         }
     }
-    public class MyFac : DefaultExpressionFunctionFactory<JToken>
+    public class ExpressionsEngine : DefaultExpressionFunctionFactory<JToken>
     {
         private readonly JToken payload;
 
-        public MyFac(JToken Payload)
+        public ExpressionsEngine(JToken Payload)
         {
             Functions["variables"] = GetVariable;
             Functions["payload"] = GetPayload;
+            Functions["md5"] = Md5;
             payload = Payload;
+        }
+
+        private Task<JToken> Md5(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
+        {
+            return Task.FromResult(arguments.First());
         }
 
         private Task<JToken> GetPayload(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
@@ -112,11 +123,33 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             {
                 ThrowOnError = false,
                 Document= JToken.FromObject(new { variables = new { test = new { helloWorld = "b" } } }),
-            }), new log(),new MyFac("helloWorld"));
+            }), new log(),new ExpressionsEngine(Payload:"helloWorld"));
 
             var test = await ex.EvaluateAsync("[variables('test')[payload()]]");
 
             Assert.Equal("b", test.ToString());
         }
+
+        [Fact]
+        public async Task Test3()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+                Document = JToken.FromObject(new { variables = new { test = new { helloWorld = "b" } } }),
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+            try
+            {
+                var test = await ex.EvaluateAsync("[md5( payload())]");
+                Assert.Equal("helloWorld", test.ToString());
+            }
+            catch(Exception exx)
+            {
+
+            }
+
+            
+        }
+
     }
 }

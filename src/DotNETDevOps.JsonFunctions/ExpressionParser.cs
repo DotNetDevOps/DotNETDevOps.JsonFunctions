@@ -101,13 +101,16 @@ namespace DotNETDevOps.JsonFunctions
         {
             Constant = Parse.LetterOrDigit.AtLeastOnce().Text().Select(k => new ConstantEvaluator(k));
 
-            Tokenizer = from expr in Parse.Ref(() => Parse.Ref(() => (Function.Or(Number).Or(QuotedString).Or(QuotedSingleString).Or(Constant)).Or(ArrayIndexer).Or(ObjectFunction).Or(PropertyAccessByDot).Or(PropertyAccessByBracket).Or(ChildAccessByBracket)).AtLeastOnce()).Optional().DelimitedBy(Parse.Char(',').Token())
+            Tokenizer = from expr in Parse.Ref(() => Parse.Ref(() => (Function.Or(Number).Or(QuotedString).Or(QuotedSingleString).Or(Constant)).Or(ArrayIndexer).Or(ObjectFunction).Or(PropertyAccessByDot).Or(PropertyAccessByBracket).Or(ChildAccessByBracket)).AtLeastOnce()).Optional().DelimitedBy(Parse.Char(',').Or(Parse.WhiteSpace).Token())
                         select FixArrayIndexers(expr.Select(c => (c.GetOrDefault() ?? Enumerable.Empty<IJTokenEvaluator>()).ToArray()).ToArray());
 
-            Function = from name in Parse.Letter.AtLeastOnce().Text()
+            Function = from whitespace1 in Parse.WhiteSpace.Many().Text()
+                       from name in Parse.Letter.AtLeastOnce().Text()
                        from charOrNumber in Parse.LetterOrDigit.Many().Text()
                        from lparen in Parse.Char('(')
+                       from whitespace2 in Parse.WhiteSpace.Many().Text()
                        from expr in Tokenizer
+                       from whitespace3 in Parse.WhiteSpace.Many().Text()
                        from rparen in Parse.Char(')')
                        select CallFunction(name+ charOrNumber, expr);
 
