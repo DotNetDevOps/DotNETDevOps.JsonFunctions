@@ -105,10 +105,11 @@ namespace DotNETDevOps.JsonFunctions
                         select FixArrayIndexers(expr.Select(c => (c.GetOrDefault() ?? Enumerable.Empty<IJTokenEvaluator>()).ToArray()).ToArray());
 
             Function = from name in Parse.Letter.AtLeastOnce().Text()
+                       from charOrNumber in Parse.LetterOrDigit.Many().Text()
                        from lparen in Parse.Char('(')
                        from expr in Tokenizer
                        from rparen in Parse.Char(')')
-                       select CallFunction(name, expr);
+                       select CallFunction(name+ charOrNumber, expr);
 
             PropertyAccessByDot = from first in Parse.Char('.')
                              from propertyName in Parse.LetterOrDigit.AtLeastOnce().Text()
