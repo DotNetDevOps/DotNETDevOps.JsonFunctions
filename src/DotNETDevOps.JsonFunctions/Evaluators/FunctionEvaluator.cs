@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json.Linq;
+using Sprache;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -12,11 +13,13 @@ namespace DotNETDevOps.JsonFunctions
     public class FunctionEvaluator : IJTokenEvaluator, IObjectHolder
     {
         private string name;
+        private readonly IOption<char> optionalFirst;
         private IJTokenEvaluator[] parameters;
         private IExpressionParser evaluator;
-        public FunctionEvaluator(IExpressionParser evaluator, string name, IJTokenEvaluator[] parameters)
+        public FunctionEvaluator(IExpressionParser evaluator, string name, IOption<char> optionalFirst, IJTokenEvaluator[] parameters)
         {
             this.name = name;
+            this.optionalFirst = optionalFirst;
             this.parameters = parameters;
             this.evaluator = evaluator;
         }

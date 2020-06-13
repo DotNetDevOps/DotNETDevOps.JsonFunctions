@@ -14,24 +14,30 @@ namespace DotNETDevOps.JsonFunctions
         Task<JToken> EvaluateAsync(string name, params JToken[] arguments);
     }
 
-    internal class ChildExpressionParser<TContext> : IJTokenEvaluator
+    internal class ChildExpressionParser<TContext> : IJTokenEvaluator , IObjectHolder
     {
         private readonly IJTokenEvaluator[] childs;
         private readonly bool throwOnError;
 
-        public ChildExpressionParser (IJTokenEvaluator[] childs, bool throwOnError)
+        public ChildExpressionParser (IJTokenEvaluator[] childs, IOption<char> optionalFirst, bool throwOnError)
         {
             this.childs = childs;
             this.throwOnError = throwOnError;
+            NullConditional = optionalFirst.IsDefined;
         }
 
-        public IJTokenEvaluator Object { get; internal set; }
+        public IJTokenEvaluator Object { get;  set; }
+        public bool NullConditional { get; set; }
 
         public async Task<JToken> EvaluateAsync()
         {
             var propertyName = await childs[0].EvaluateAsync();
 
             var token = await Object.EvaluateAsync();
+        
+            if ((token is null || token.Type == JTokenType.Null) && NullConditional)
+                return token;
+
             if (token is JObject jobject)
                 return jobject[propertyName.ToString()];
 
@@ -130,7 +136,7 @@ namespace DotNETDevOps.JsonFunctions
                 from expr in Tokenizer
                 from whitespace3 in Parse.WhiteSpace.Many().Text()
                 from rparen in Parse.Char(')')
-                select CallFunction(name+ charOrNumber, expr);
+                select CallFunction(name + charOrNumber,null, expr);
 
             PropertyAccessByDot = 
                 from optionalFirst in Parse.Optional(Parse.Char('?'))
@@ -145,25 +151,28 @@ namespace DotNETDevOps.JsonFunctions
                 select new ObjectLookup(propertyName, optionalFirst, options.Value.ThrowOnError);
 
             ChildAccessByBracket =
+                from optionalFirst in Parse.Optional(Parse.Char('?'))
                 from first in Parse.Char('[')
                 from propertyName in Tokenizer
                 from last in Parse.Char(']')
-                select new ChildExpressionParser<TContext>(propertyName, options.Value.ThrowOnError);
+                select new ChildExpressionParser<TContext>(propertyName, optionalFirst, options.Value.ThrowOnError);
 
 
-            ObjectFunction = 
+            ObjectFunction =
+                from optionalFirst in Parse.Optional(Parse.Char('?'))
                 from first in Parse.Char('.')
                 from name in Parse.LetterOrDigit.AtLeastOnce().Text()
                 from lparen in Parse.Char('(')
                 from expr in Tokenizer
                 from rparen in Parse.Char(')')
-                select CallFunction(name, expr);
+                select CallFunction(name, optionalFirst, expr);
 
-            ArrayIndexer = 
-                from first in Parse.Char('[')
+            ArrayIndexer =
+                 from optionalFirst in Parse.Optional(Parse.Char('?'))
+                 from first in Parse.Char('[')
                 from text in Parse.Number
                 from last in Parse.Char(']')
-                select new ArrayIndexLookup(text);
+                select new ArrayIndexLookup(text, optionalFirst);
 
             this.options = options;
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -208,13 +217,13 @@ namespace DotNETDevOps.JsonFunctions
 
 
                 }
-                for(var i = 0; i < functions.Length-1; i++)
-                {
-                    if (functions[i].NullConditional)
-                    {
-                        functions[i + 1].NullConditional = true;
-                    }
-                }
+                //for(var i = 0; i < functions.Length-1; i++)
+                //{
+                //    if (functions[i].NullConditional)
+                //    {
+                //        functions[i + 1].NullConditional = true;
+                //    }
+                //}
                 return functions.Last();
             }
 
@@ -237,9 +246,9 @@ namespace DotNETDevOps.JsonFunctions
             return value;
         }
 
-        IJTokenEvaluator CallFunction(string name, IJTokenEvaluator[] parameters)
+        IJTokenEvaluator CallFunction(string name, IOption<char> optionalFirst, IJTokenEvaluator[] parameters)
         {
-            return new FunctionEvaluator(this, name, parameters);
+            return new FunctionEvaluator(this, name, optionalFirst, parameters);
         }
 
         public async Task<JToken> EvaluateAsync(string str)

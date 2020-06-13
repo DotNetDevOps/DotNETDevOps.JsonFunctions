@@ -26,7 +26,7 @@ namespace DotNETDevOps.JsonFunctions
         {
            
             var token = await Object.EvaluateAsync();
-            if (token is null || token.Type == JTokenType.Null && NullConditional)
+            if ((token is null || token.Type == JTokenType.Null) && NullConditional)
                 return token;
 
             if (token is JObject jobject)

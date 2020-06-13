@@ -85,8 +85,15 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             Functions["md5"] = Md5;
             Functions["merge"] = Merge;
             Functions["select"] = Select;
+            Functions["dummy"] = Dummy;
             payload = Payload;
         }
+
+        private Task<JToken> Dummy(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
+        {
+            return Task.FromResult<JToken>("entity");
+        }
+
         private Task<JToken> Select(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
         {
             var item = arguments.FirstOrDefault();
@@ -233,7 +240,39 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
                 Document = JToken.FromObject(new { variables = new { testvariable = new { test = new { nested = "b" } } } }),
             }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
 
-            var test = await ex.EvaluateAsync("[variables('testvariable')?['test2'].nested]");
+            var test = await ex.EvaluateAsync("[variables('testvariable')?['test2']?.nested]");
+
+            Assert.Null(test);
+
+           
+        }
+
+        [Fact]
+        public async Task Test8()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+                Document = JToken.FromObject(new { variables = new { forms = new { entity = new { attribute = new { main = new { disabled=false} } } } } }),
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+
+            var test = await ex.EvaluateAsync("[variables('forms')[dummy()]?['attribute']['main'].disabled]");
+
+            Assert.False(test?.ToObject<bool>());
+
+
+        }
+
+        [Fact]
+        public async Task Test9()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+                Document = JToken.FromObject(new { variables = new { forms = new { entity = new { attribute = new { main2 = new { disabled = false } } } } } }),
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+
+            var test = await ex.EvaluateAsync("[variables('forms')?[dummy()]?['attribute']?['main']?.disabled]");
 
             Assert.Null(test);
 
