@@ -4,7 +4,12 @@ using System.Threading.Tasks;
 
 namespace DotNETDevOps.JsonFunctions
 {
-    public class FunctionEvaluator : IJTokenEvaluator
+    public interface IObjectHolder: IJTokenEvaluator
+    {
+        IJTokenEvaluator Object { get;  set; }
+        bool NullConditional { get; set; }
+    }
+    public class FunctionEvaluator : IJTokenEvaluator, IObjectHolder
     {
         private string name;
         private IJTokenEvaluator[] parameters;
@@ -24,6 +29,7 @@ namespace DotNETDevOps.JsonFunctions
             return await evaluator.EvaluateAsync(name, await Task.WhenAll(parameters.Select(p => p.EvaluateAsync())));
         }
 
-        public IJTokenEvaluator Object { get; internal set; }
+        public IJTokenEvaluator Object { get;  set; }
+        public bool NullConditional { get; set; }
     }
 }

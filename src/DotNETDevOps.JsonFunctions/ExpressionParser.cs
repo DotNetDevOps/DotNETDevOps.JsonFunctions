@@ -101,44 +101,70 @@ namespace DotNETDevOps.JsonFunctions
         {
             Constant = Parse.LetterOrDigit.AtLeastOnce().Text().Select(k => new ConstantEvaluator(k));
 
-            Tokenizer = from expr in Parse.Ref(() => Parse.Ref(() => (Function.Or(Number).Or(QuotedString).Or(QuotedSingleString).Or(Constant)).Or(ArrayIndexer).Or(ObjectFunction).Or(PropertyAccessByDot).Or(PropertyAccessByBracket).Or(ChildAccessByBracket)).AtLeastOnce()).Optional().DelimitedBy(Parse.Char(',').Or(Parse.WhiteSpace).Token())
-                        select FixArrayIndexers(expr.Select(c => (c.GetOrDefault() ?? Enumerable.Empty<IJTokenEvaluator>()).ToArray()).ToArray());
+            Tokenizer = 
+                from expr in Parse.Ref(
+                    () => Parse.Ref(
+                        () => (
+                            Function
+                            .Or(Number)
+                            .Or(QuotedString)
+                            .Or(QuotedSingleString)
+                            .Or(Constant)
+                        )
+                        .Or(ArrayIndexer)
+                        .Or(ObjectFunction)
+                        .Or(PropertyAccessByDot)
+                        .Or(PropertyAccessByBracket)
+                        .Or(ChildAccessByBracket)
+                    )
+                    .AtLeastOnce()
+                ).Optional().DelimitedBy(Parse.Char(',').Or(Parse.WhiteSpace).Token())
+                select FixArrayIndexers(expr.Select(c => (c.GetOrDefault() ?? Enumerable.Empty<IJTokenEvaluator>()).ToArray()).ToArray());
 
-            Function = from whitespace1 in Parse.WhiteSpace.Many().Text()
-                       from name in Parse.Letter.AtLeastOnce().Text()
-                       from charOrNumber in Parse.LetterOrDigit.Many().Text()
-                       from lparen in Parse.Char('(')
-                       from whitespace2 in Parse.WhiteSpace.Many().Text()
-                       from expr in Tokenizer
-                       from whitespace3 in Parse.WhiteSpace.Many().Text()
-                       from rparen in Parse.Char(')')
-                       select CallFunction(name+ charOrNumber, expr);
+            Function = 
+                from whitespace1 in Parse.WhiteSpace.Many().Text()
+                from name in Parse.Letter.AtLeastOnce().Text()
+                from charOrNumber in Parse.LetterOrDigit.Many().Text()
+                from lparen in Parse.Char('(')
+                from whitespace2 in Parse.WhiteSpace.Many().Text()
+                from expr in Tokenizer
+                from whitespace3 in Parse.WhiteSpace.Many().Text()
+                from rparen in Parse.Char(')')
+                select CallFunction(name+ charOrNumber, expr);
 
-            PropertyAccessByDot = from first in Parse.Char('.')
-                             from propertyName in Parse.LetterOrDigit.AtLeastOnce().Text()
-                             select new ObjectLookup(propertyName,options.Value.ThrowOnError);
-            PropertyAccessByBracket = from first in Parse.Char('[')
-                                      from propertyName in (Parse.LetterOrDigit.Or(Parse.Char('\'')).AtLeastOnce().Text())
-                                      from last in Parse.Char(']')
-                                      select new ObjectLookup(propertyName, options.Value.ThrowOnError);
+            PropertyAccessByDot = 
+                from optionalFirst in Parse.Optional(Parse.Char('?'))
+                from first in Parse.Char('.')
+                from propertyName in Parse.LetterOrDigit.AtLeastOnce().Text()
+                select new ObjectLookup(propertyName, optionalFirst, options.Value.ThrowOnError);
+            PropertyAccessByBracket =
+                from optionalFirst in Parse.Optional(Parse.Char('?'))
+                from first in Parse.Char('[')
+                from propertyName in (Parse.LetterOrDigit.Or(Parse.Char('\'')).AtLeastOnce().Text())
+                from last in Parse.Char(']')
+                select new ObjectLookup(propertyName, optionalFirst, options.Value.ThrowOnError);
 
-            ChildAccessByBracket = from first in Parse.Char('[')
-                                   from propertyName in Tokenizer
-                                   from last in Parse.Char(']')
-                                   select new ChildExpressionParser<TContext>(propertyName, options.Value.ThrowOnError);
+            ChildAccessByBracket =
+                from first in Parse.Char('[')
+                from propertyName in Tokenizer
+                from last in Parse.Char(']')
+                select new ChildExpressionParser<TContext>(propertyName, options.Value.ThrowOnError);
 
 
-            ObjectFunction = from first in Parse.Char('.')
-                                 from name in Parse.LetterOrDigit.AtLeastOnce().Text()
-                                 from lparen in Parse.Char('(')
-                                 from expr in Tokenizer
-                                 from rparen in Parse.Char(')')
-                                 select CallFunction(name, expr);
+            ObjectFunction = 
+                from first in Parse.Char('.')
+                from name in Parse.LetterOrDigit.AtLeastOnce().Text()
+                from lparen in Parse.Char('(')
+                from expr in Tokenizer
+                from rparen in Parse.Char(')')
+                select CallFunction(name, expr);
 
-            ArrayIndexer = from first in Parse.Char('[')
-                           from text in Parse.Number
-                           from last in Parse.Char(']')
-                           select new ArrayIndexLookup(text); ;
+            ArrayIndexer = 
+                from first in Parse.Char('[')
+                from text in Parse.Number
+                from last in Parse.Char(']')
+                select new ArrayIndexLookup(text);
+
             this.options = options;
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             this.functions = functions ?? throw new ArgumentNullException(nameof(functions));
@@ -172,16 +198,23 @@ namespace DotNETDevOps.JsonFunctions
             }
 
 
-            if (c.Length > 1 && c.All(a=>a is FunctionEvaluator))
+            if (c.Length > 1 && c.All(a=>a is IObjectHolder))
             {
-                var functions = c.Cast<FunctionEvaluator>().ToArray();
+                var functions = c.OfType<IObjectHolder>().ToArray();
                 
                 for (var j = functions.Length - 1; j > 0; j--)
                 {
                     functions[j].Object = functions[j - 1];
 
 
-                 }
+                }
+                for(var i = 0; i < functions.Length-1; i++)
+                {
+                    if (functions[i].NullConditional)
+                    {
+                        functions[i + 1].NullConditional = true;
+                    }
+                }
                 return functions.Last();
             }
 

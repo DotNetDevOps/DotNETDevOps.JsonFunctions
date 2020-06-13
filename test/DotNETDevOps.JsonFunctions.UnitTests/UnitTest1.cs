@@ -83,9 +83,30 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             Functions["variables"] = GetVariable;
             Functions["payload"] = GetPayload;
             Functions["md5"] = Md5;
+            Functions["merge"] = Merge;
+            Functions["select"] = Select;
             payload = Payload;
         }
+        private Task<JToken> Select(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
+        {
+            var item = arguments.FirstOrDefault();
+            if (item is JObject obj)
+            {
+                return Task.FromResult(JToken.FromObject(arguments.Skip(1).ToDictionary(k => k.ToString(), a => obj[a.ToString()])));
+            }
+            throw new NotImplementedException();
+        }
 
+        private Task<JToken> Merge(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
+        {
+            var first = new JObject();
+            foreach (JObject obj in arguments)
+            {
+                foreach (var prop in obj.Properties())
+                    first[prop.Name] = prop.Value;
+            }
+            return Task.FromResult(first as JToken);
+        }
         private Task<JToken> Md5(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
         {
             return Task.FromResult(arguments.First());
@@ -148,7 +169,75 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
 
             }
 
-            
+
+        }
+        [Fact]
+        public async Task Test4()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+                Document = JToken.FromObject(new { variables = new { test = new { helloWorld = "b" } } }),
+            }), new log(), new ExpressionsEngine(Payload: new JObject(new JProperty( "helloWorld","a"))));
+            try
+            {
+                var test = await ex.EvaluateAsync("[merge(select(payload(1),'seqno','data','port','fcnt','freq','dr'),select(payload(0),'rssi','snr'))]");
+                Assert.Equal("helloWorld", test.ToString());
+            }
+            catch (Exception exx)
+            {
+
+            }
+
+
+        }
+
+        [Fact]
+        public async Task Test5()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+                Document = JToken.FromObject(new { variables = new { testvariable = new { test = new { nested = "b" } } } }),
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+
+            var test = await ex.EvaluateAsync("[variables('testvariable')['test'].nested]");
+
+            Assert.Equal("b", test.ToString());
+
+
+        }
+
+        [Fact]
+        public async Task Test6()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+                Document = JToken.FromObject(new { variables = new { testvariable = new { test = new { nested = "b" } } } }),
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+
+            var test = await ex.EvaluateAsync("[variables('testvariable')['test2']?.nested]");
+
+            Assert.Null(test);
+
+
+        }
+
+        [Fact]
+        public async Task Test7()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+                Document = JToken.FromObject(new { variables = new { testvariable = new { test = new { nested = "b" } } } }),
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+
+            var test = await ex.EvaluateAsync("[variables('testvariable')?['test2'].nested]");
+
+            Assert.Null(test);
+
+
         }
 
     }
