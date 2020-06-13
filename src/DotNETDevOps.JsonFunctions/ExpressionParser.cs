@@ -5,125 +5,57 @@ using Sprache;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace DotNETDevOps.JsonFunctions
 {
-    public interface IJTokenEvaluator
+    public interface IExpressionParser
     {
-        JToken Evaluate();
+        Task<JToken> EvaluateAsync(string name, params JToken[] arguments);
     }
-    internal class ObjectLookup : IJTokenEvaluator
+
+    internal class ChildExpressionParser<TContext> : IJTokenEvaluator
     {
-        public string propertyName;
+        private readonly IJTokenEvaluator[] childs;
         private readonly bool throwOnError;
 
-        public ObjectLookup(string propertyName, bool throwOnError)
+        public ChildExpressionParser (IJTokenEvaluator[] childs, bool throwOnError)
         {
-            this.propertyName = propertyName;
+            this.childs = childs;
             this.throwOnError = throwOnError;
         }
 
         public IJTokenEvaluator Object { get; internal set; }
 
-        public JToken Evaluate()
+        public async Task<JToken> EvaluateAsync()
         {
-            var token = Object.Evaluate();
-            if(token is JObject jobject)
-                return jobject[propertyName];
+            var propertyName = await childs[0].EvaluateAsync();
+
+            var token = await Object.EvaluateAsync();
+            if (token is JObject jobject)
+                return jobject[propertyName.ToString()];
 
             if (throwOnError)
                 throw new Exception("Cant look up property on none object");
 
             return $"{token.ToString()}.{propertyName}";
+
+             
         }
     }
-
-    public class StringConstantEvaluator : IJTokenEvaluator
-    {
-        private string text;
-
-        public StringConstantEvaluator(string text)
-        {
-            this.text = text;
-        }
-
-        public JToken Evaluate()
-        {
-            return text;
-        }
-    }
-    public class DecimalConstantEvaluator : IJTokenEvaluator
-    {
-        private decimal @decimal;
-
-        public DecimalConstantEvaluator(decimal @decimal)
-        {
-            this.@decimal = @decimal;
-        }
-
-        public JToken Evaluate()
-        {
-            return JToken.FromObject(@decimal);
-        }
-    }
-    public class ConstantEvaluator : IJTokenEvaluator
-    {
-        private string k;
-
-        public ConstantEvaluator(string k)
-        {
-            this.k = k;
-        }
-
-        public JToken Evaluate()
-        {
-            return JToken.Parse(k);
-        }
-    }
-    public class ArrayIndexLookup : IJTokenEvaluator
-    {
-        public string parsedText;
-
-        public ArrayIndexLookup(string parsedText)
-        {
-            this.parsedText = parsedText;
-        }
-
-        public IJTokenEvaluator ArrayEvaluator { get; set; }
-
-        public JToken Evaluate()
-        {
-            return ArrayEvaluator.Evaluate()[int.Parse(parsedText)];
-        }
-    }
-    public interface IExpressionFunctionFactory
-    {
-        ExpressionParser.ExpressionFunction Get(string name);
-    }
-    public class DefaultExpressionFunctionFactory : IExpressionFunctionFactory
-    {
-       
-        public Dictionary<string, ExpressionParser.ExpressionFunction> Functions { get; set; } = new Dictionary<string, ExpressionParser.ExpressionFunction>();
-
-        public ExpressionParser.ExpressionFunction Get(string name)
-        {
-            return Functions[name];
-        }
-    }
-    public class ExpressionParserOptions
-    {
-        public bool ThrowOnError { get; set; } = true;
-        public JToken Document { get; set; }
-    }
-    public class ExpressionParser
+    public class ExpressionParser<TContext> : IExpressionParser
     {
 
-        public delegate JToken ExpressionFunction(JToken document, JToken[] arguments);
+        public delegate Task<JToken> ExpressionFunction(ExpressionParser<TContext> parser, TContext document, JToken[] arguments);
 
         public readonly Parser<IJTokenEvaluator> Function;
         public readonly Parser<IJTokenEvaluator> Constant;
         public readonly Parser<IJTokenEvaluator> ArrayIndexer;
-        public readonly Parser<IJTokenEvaluator> PropertyAccess;
+        public readonly Parser<IJTokenEvaluator> PropertyAccessByDot;
+        public readonly Parser<IJTokenEvaluator> PropertyAccessByBracket;
+        public readonly Parser<IJTokenEvaluator> ChildAccessByBracket;
+        
+        public readonly Parser<IJTokenEvaluator> ObjectFunction;        
         public readonly Parser<IJTokenEvaluator[]> Tokenizer;
 
         private static readonly Parser<char> DoubleQuote = Parse.Char('"');
@@ -158,34 +90,81 @@ namespace DotNETDevOps.JsonFunctions
                                                            from num in Parse.Decimal
                                                            from trailingSpaces in Parse.Char(' ').Many()
                                                            select new DecimalConstantEvaluator(decimal.Parse(num) * (op.IsDefined ? -1 : 1));
-        private readonly IOptions<ExpressionParserOptions> options;
+        private readonly IOptions<ExpressionParserOptions<TContext>> options;
         private readonly ILogger logger;
-        private readonly IExpressionFunctionFactory functions;
+        private readonly IExpressionFunctionFactory<TContext> functions;
 
-        public JToken Document => this.options.Value.Document;
+        public TContext Document => this.options.Value.Document;
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
-        public ExpressionParser(IOptions<ExpressionParserOptions> options, ILogger logger, IExpressionFunctionFactory functions)
+        public ExpressionParser(IOptions<ExpressionParserOptions<TContext>> options, ILogger logger, IExpressionFunctionFactory<TContext> functions)
         {
             Constant = Parse.LetterOrDigit.AtLeastOnce().Text().Select(k => new ConstantEvaluator(k));
 
-            Tokenizer = from expr in Parse.Ref(() => Parse.Ref(() => (Function.Or(Number).Or(QuotedString).Or(QuotedSingleString).Or(Constant)).Or(ArrayIndexer).Or(PropertyAccess)).AtLeastOnce()).Optional().DelimitedBy(Parse.Char(',').Token())
-                        select FixArrayIndexers(expr.Select(c => (c.GetOrDefault() ?? Enumerable.Empty<IJTokenEvaluator>()).ToArray()).ToArray());
+            Tokenizer = 
+                from expr in Parse.Ref(
+                    () => Parse.Ref(
+                        () => (
+                            Function
+                            .Or(Number)
+                            .Or(QuotedString)
+                            .Or(QuotedSingleString)
+                            .Or(Constant)
+                        )
+                        .Or(ArrayIndexer)
+                        .Or(ObjectFunction)
+                        .Or(PropertyAccessByDot)
+                        .Or(PropertyAccessByBracket)
+                        .Or(ChildAccessByBracket)
+                    )
+                    .AtLeastOnce()
+                ).Optional().DelimitedBy(Parse.Char(',').Or(Parse.WhiteSpace).Token())
+                select FixArrayIndexers(expr.Select(c => (c.GetOrDefault() ?? Enumerable.Empty<IJTokenEvaluator>()).ToArray()).ToArray());
 
-            Function = from name in Parse.Letter.AtLeastOnce().Text()
-                       from lparen in Parse.Char('(')
-                       from expr in Tokenizer
-                       from rparen in Parse.Char(')')
-                       select CallFunction(name, expr);
+            Function = 
+                from whitespace1 in Parse.WhiteSpace.Many().Text()
+                from name in Parse.Letter.AtLeastOnce().Text()
+                from charOrNumber in Parse.LetterOrDigit.Many().Text()
+                from lparen in Parse.Char('(')
+                from whitespace2 in Parse.WhiteSpace.Many().Text()
+                from expr in Tokenizer
+                from whitespace3 in Parse.WhiteSpace.Many().Text()
+                from rparen in Parse.Char(')')
+                select CallFunction(name+ charOrNumber, expr);
 
-            PropertyAccess = from first in Parse.Char('.')
-                             from propertyName in Parse.LetterOrDigit.AtLeastOnce().Text()
-                             select new ObjectLookup(propertyName,options.Value.ThrowOnError);
+            PropertyAccessByDot = 
+                from optionalFirst in Parse.Optional(Parse.Char('?'))
+                from first in Parse.Char('.')
+                from propertyName in Parse.LetterOrDigit.AtLeastOnce().Text()
+                select new ObjectLookup(propertyName, optionalFirst, options.Value.ThrowOnError);
+            PropertyAccessByBracket =
+                from optionalFirst in Parse.Optional(Parse.Char('?'))
+                from first in Parse.Char('[')
+                from propertyName in (Parse.LetterOrDigit.Or(Parse.Char('\'')).AtLeastOnce().Text())
+                from last in Parse.Char(']')
+                select new ObjectLookup(propertyName, optionalFirst, options.Value.ThrowOnError);
 
-            ArrayIndexer = from first in Parse.Char('[')
-                           from text in Parse.Number
-                           from last in Parse.Char(']')
-                           select new ArrayIndexLookup(text); ;
+            ChildAccessByBracket =
+                from first in Parse.Char('[')
+                from propertyName in Tokenizer
+                from last in Parse.Char(']')
+                select new ChildExpressionParser<TContext>(propertyName, options.Value.ThrowOnError);
+
+
+            ObjectFunction = 
+                from first in Parse.Char('.')
+                from name in Parse.LetterOrDigit.AtLeastOnce().Text()
+                from lparen in Parse.Char('(')
+                from expr in Tokenizer
+                from rparen in Parse.Char(')')
+                select CallFunction(name, expr);
+
+            ArrayIndexer = 
+                from first in Parse.Char('[')
+                from text in Parse.Number
+                from last in Parse.Char(']')
+                select new ArrayIndexLookup(text);
+
             this.options = options;
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             this.functions = functions ?? throw new ArgumentNullException(nameof(functions));
@@ -212,12 +191,38 @@ namespace DotNETDevOps.JsonFunctions
                 lookup.Object = c[0];
                 return lookup;
             }
+            if (c.Length == 2 && c[1] is ChildExpressionParser<TContext> childContext)
+            {
+               childContext.Object = c[0];
+                return childContext;
+            }
+
+
+            if (c.Length > 1 && c.All(a=>a is IObjectHolder))
+            {
+                var functions = c.OfType<IObjectHolder>().ToArray();
+                
+                for (var j = functions.Length - 1; j > 0; j--)
+                {
+                    functions[j].Object = functions[j - 1];
+
+
+                }
+                for(var i = 0; i < functions.Length-1; i++)
+                {
+                    if (functions[i].NullConditional)
+                    {
+                        functions[i + 1].NullConditional = true;
+                    }
+                }
+                return functions.Last();
+            }
 
             return null;
 
         }
 
-        public JToken Evaluate(string name, params JToken[] arguments)
+        public async Task<JToken> EvaluateAsync(string name, params JToken[] arguments)
         {
             var function = functions.Get(name);
             if(function == null)
@@ -226,7 +231,7 @@ namespace DotNETDevOps.JsonFunctions
             }
            
 
-            var value =function(Document, arguments);
+            var value =await function(this,Document, arguments);
 
 
             return value;
@@ -237,15 +242,25 @@ namespace DotNETDevOps.JsonFunctions
             return new FunctionEvaluator(this, name, parameters);
         }
 
-        public JToken Evaluate(string str)
+        public async Task<JToken> EvaluateAsync(string str)
         {
-            var value = EvaluateImp(str);
-            logger.LogInformation("Evaluating '{str}' to '{value}'", str, value.ToString());
-            return value;
+            using (logger.BeginScope(new Dictionary<string, string> { ["expression"] = str }))
+            {
+                try
+                {
+                    var value = await EvaluateImp(str);
+                    logger.LogTrace("Evaluating '{str}' to '{value}'", str, value?.ToString());
+                    return value;
+                }catch(Exception ex)
+                {
+                    logger.LogError(ex, "Failed to evaluate expression");
+                    throw;
+                }
+            }
 
         }
 
-        private JToken EvaluateImp(string str)
+        private async Task<JToken> EvaluateImp(string str)
         {
             Parser<IJTokenEvaluator[]> stringParser =
                  from first in Parse.Char('[')
@@ -257,13 +272,13 @@ namespace DotNETDevOps.JsonFunctions
 
             var func = stringParser.Parse(str).ToArray();
             if (func.Length == 1)
-                return func.First().Evaluate();
+                return await func.First().EvaluateAsync();
 
             for (var i = 0; i < func.Length; i++)
             {
                 if (func[i] is ArrayIndexLookup array)
                 {
-                    var arrayToken = func[i - 1].Evaluate();
+                    var arrayToken = await func[i - 1].EvaluateAsync();
                     if (arrayToken.Type != JTokenType.Array)
                         throw new Exception("not an array");
 
@@ -272,7 +287,7 @@ namespace DotNETDevOps.JsonFunctions
                 }
                 else if (func[i] is ObjectLookup objectLookup)
                 {
-                    var arrayToken = func[i - 1].Evaluate();
+                    var arrayToken = await func[i - 1].EvaluateAsync();
                     if (arrayToken.Type != JTokenType.Object)
                         throw new Exception("not an object");
 
@@ -283,24 +298,5 @@ namespace DotNETDevOps.JsonFunctions
 
             return null;
         }
-    }
-    public class FunctionEvaluator : IJTokenEvaluator
-    {
-        private string name;
-        private IJTokenEvaluator[] parameters;
-        private ExpressionParser evaluator;
-        public FunctionEvaluator(ExpressionParser evaluator, string name, IJTokenEvaluator[] parameters)
-        {
-            this.name = name;
-            this.parameters = parameters;
-            this.evaluator = evaluator;
-        }
-
-        public JToken Evaluate()
-        {
-            return evaluator.Evaluate(name, parameters.Select(p => p.Evaluate()).ToArray());
-        }
-
-
     }
 }
