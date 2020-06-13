@@ -28,6 +28,11 @@ stages:
       vmImage: 'windows-2019'
     variables:
       buildConfiguration: 'Release'
+      major: 3
+      minor: 0
+      patch: $[counter(format('{0}.{1}',variables['major'],variables['minor']),1)]
+      packageVersionType: ""
+      packageVersion: $(major).$(minor).$(patch)$(packageversionType)
 
     steps:
     # .NET Core
@@ -45,6 +50,8 @@ stages:
         configuration: '$(buildConfiguration)'
         packagesToPack: 'src/**/*.csproj' # Required when command == pack
         packDirectory: '$(build.artifactStagingDirectory)' # Optional
+        versioningScheme: byEnvVar
+        versionEnvVar: packageVersion
         #nobuild: false # Optional
         #versioningScheme: 'off' # Options: off, byPrereleaseNumber, byEnvVar, byBuildNumber
         #versionEnvVar: # Required when versioningScheme == byEnvVar
