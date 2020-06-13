@@ -7,7 +7,7 @@ namespace DotNETDevOps.JsonFunctions
     {
         public string parsedText;
 
-        public ArrayIndexLookup(string parsedText)
+        public ArrayIndexLookup(string parsedText, Sprache.IOption<char> optionalFirst)
         {
             this.parsedText = parsedText;
         }
