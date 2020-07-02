@@ -138,15 +138,16 @@ namespace DotNETDevOps.JsonFunctions
                 from rparen in Parse.Char(')')
                 select CallFunction(name + charOrNumber,null, expr);
 
+           
             PropertyAccessByDot = 
                 from optionalFirst in Parse.Optional(Parse.Char('?'))
                 from first in Parse.Char('.')
-                from propertyName in Parse.LetterOrDigit.AtLeastOnce().Text()
+                from propertyName in Parse.LetterOrDigit.Or(Parse.Char('_')).AtLeastOnce().Text()
                 select new ObjectLookup(propertyName, optionalFirst, options.Value.ThrowOnError);
             PropertyAccessByBracket =
                 from optionalFirst in Parse.Optional(Parse.Char('?'))
                 from first in Parse.Char('[')
-                from propertyName in (Parse.LetterOrDigit.Or(Parse.Char('\'')).AtLeastOnce().Text())
+                from propertyName in (Parse.LetterOrDigit.Or(Parse.Char('\'')).Or(Parse.Char('_')).AtLeastOnce().Text())
                 from last in Parse.Char(']')
                 select new ObjectLookup(propertyName, optionalFirst, options.Value.ThrowOnError);
 
@@ -161,7 +162,7 @@ namespace DotNETDevOps.JsonFunctions
             ObjectFunction =
                 from optionalFirst in Parse.Optional(Parse.Char('?'))
                 from first in Parse.Char('.')
-                from name in Parse.LetterOrDigit.AtLeastOnce().Text()
+                from name in Parse.LetterOrDigit.Or(Parse.Char('_')).AtLeastOnce().Text()
                 from lparen in Parse.Char('(')
                 from expr in Tokenizer
                 from rparen in Parse.Char(')')

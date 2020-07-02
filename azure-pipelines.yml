@@ -82,10 +82,10 @@ stages:
         artifactName: 'drop'
         targetPath: '$(System.ArtifactsDirectory)'
 
-    - task: UpdateNugetPackageVersionsTask@1
-      inputs:
-        PackageFolder: '$(build.artifactStagingDirectory)'
-        PackageFeatureName: 'pre'
+#    - task: UpdateNugetPackageVersionsTask@1
+#      inputs:
+#        PackageFolder: '$(build.artifactStagingDirectory)'
+#        PackageFeatureName: 'pre'
            
     - task: PublishPipelineArtifact@0
       inputs:

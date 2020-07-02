@@ -86,6 +86,8 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             Functions["merge"] = Merge;
             Functions["select"] = Select;
             Functions["dummy"] = Dummy;
+            Functions["lookup"] = (_, __, ___) => Task.FromResult<JToken>(null);
+            Functions["body"] = (_, __, ___) => Task.FromResult<JToken>(null);
             payload = Payload;
         }
 
@@ -278,6 +280,21 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
 
 
         }
+        [Fact]
+        public async Task Test10()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+                Document = JToken.FromObject(new { variables = new { forms = new { entity = new { attribute = new { main2 = new { disabled = false } } } } } }),
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
 
+            var test = await ex.EvaluateAsync("[lookup('dca_theme', lookup('dca_product', body()?.dca_product)?.dca_theme)?.dca_name]");
+
+            Assert.Null(test);
+
+
+        }
+      
     }
 }
