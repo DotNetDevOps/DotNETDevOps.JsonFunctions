@@ -31,6 +31,9 @@ namespace DotNETDevOps.JsonFunctions
 
         public async Task<JToken> EvaluateAsync()
         {
+            if (childs.Skip(1).Any() && Object == null)
+                return new JArray( await Task.WhenAll(childs.Select(k => k.EvaluateAsync())));
+
             var propertyName = await childs[0].EvaluateAsync();
 
             var token = await Object.EvaluateAsync();
@@ -59,7 +62,7 @@ namespace DotNETDevOps.JsonFunctions
         public readonly Parser<IJTokenEvaluator> ArrayIndexer;
         public readonly Parser<IJTokenEvaluator> PropertyAccessByDot;
         public readonly Parser<IJTokenEvaluator> PropertyAccessByBracket;
-        public readonly Parser<IJTokenEvaluator> ChildAccessByBracket;
+        public readonly Parser<IJTokenEvaluator> BracketParser;
         
         public readonly Parser<IJTokenEvaluator> ObjectFunction;        
         public readonly Parser<IJTokenEvaluator[]> Tokenizer;
@@ -121,7 +124,7 @@ namespace DotNETDevOps.JsonFunctions
                         .Or(ObjectFunction)
                         .Or(PropertyAccessByDot)
                         .Or(PropertyAccessByBracket)
-                        .Or(ChildAccessByBracket)
+                        .Or(BracketParser)
                     )
                     .AtLeastOnce()
                 ).Optional().DelimitedBy(Parse.Char(',').Or(Parse.WhiteSpace).Token())
@@ -151,12 +154,12 @@ namespace DotNETDevOps.JsonFunctions
                 from last in Parse.Char(']')
                 select new ObjectLookup(propertyName, optionalFirst, options.Value.ThrowOnError);
 
-            ChildAccessByBracket =
+            BracketParser =
                 from optionalFirst in Parse.Optional(Parse.Char('?'))
                 from first in Parse.Char('[')
-                from propertyName in Tokenizer
+                from propertyNameOrChilds in Tokenizer
                 from last in Parse.Char(']')
-                select new ChildExpressionParser<TContext>(propertyName, optionalFirst, options.Value.ThrowOnError);
+                select new ChildExpressionParser<TContext>(propertyNameOrChilds, optionalFirst, options.Value.ThrowOnError);
 
 
             ObjectFunction =

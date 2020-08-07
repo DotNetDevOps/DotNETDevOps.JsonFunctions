@@ -88,7 +88,12 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             Functions["dummy"] = Dummy;
             Functions["lookup"] = (_, __, ___) => Task.FromResult<JToken>(null);
             Functions["body"] = (_, __, ___) => Task.FromResult<JToken>(null);
+            Functions["in"] = InExpressionFunction;
             payload = Payload;
+        }
+        private Task<JToken> InExpressionFunction(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
+        {
+            return Task.FromResult<JToken>(arguments[1].Any(el => el.Equals(arguments.First())));
         }
 
         private Task<JToken> Dummy(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
@@ -295,6 +300,23 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
 
 
         }
-      
+
+        [Fact]
+        public async Task Test11()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+               
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+
+            var test = await ex.EvaluateAsync("[in(9,[9, 10, 11, 15, 16, 20, 21])]");
+             
+            Assert.True(test.ToObject<bool>());
+
+
+        }
+
+        
     }
 }
