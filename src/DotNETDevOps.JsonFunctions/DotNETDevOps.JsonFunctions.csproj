@@ -8,7 +8,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
-    <PackageReference Include="Sprache" Version="2.2.0" />
+    <PackageReference Include="Sprache" Version="2.3.0" />
   </ItemGroup>
 
 </Project>
