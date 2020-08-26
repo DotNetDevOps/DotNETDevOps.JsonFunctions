@@ -68,18 +68,33 @@ namespace DotNETDevOps.JsonFunctions
         public readonly Parser<IJTokenEvaluator[]> Tokenizer;
 
         private static readonly Parser<char> DoubleQuote = Parse.Char('"');
-        private static readonly Parser<char> SingleQuote = Parse.Char('\'');
-        private static readonly Parser<char> Backslash = Parse.Char('\\');
+       // private static readonly Parser<char> SingleQuote = Parse.Char('\'');
+       // private static readonly Parser<char> Backslash = Parse.Char('\\');
+       // private static readonly Parser<IEnumerable<char>> EscapedQuote = Parse.String("\\'").Text().Named("Escaped delimiter");
+        private static readonly Parser<string> escapedDelimiter = Parse.String("''").Text().Named("Escaped delimiter");
+        private static readonly Parser<string> escapedDelimiter2 = Parse.String("\\'").Text().Named("Escaped delimiter");
+        private static readonly Parser<string> singleEscape = Parse.String("\\").Text().Named("Single escape character");
+        private static readonly Parser<string> doubleEscape = Parse.String("\\\\").Text().Named("Escaped escape character");
+        private static readonly Parser<char> delimiter = Parse.Char('\'').Named("Delimiter");
 
         private static readonly Parser<char> QdText =
             Parse.AnyChar.Except(DoubleQuote);
-        private static readonly Parser<char> QdText1 =
-            Parse.AnyChar.Except(SingleQuote);
+        //private static readonly Parser<char> QdText1 =
+        //    (Parse.AnyChar).Except(SingleQuote);
 
         //private static readonly Parser<char> QuotedPair =
         //    from _ in Backslash
-        //    from c in Parse.AnyChar
+        //    from c in SingleQuote
         //    select c;
+
+        private static readonly Parser<IEnumerable<char>> simpleLiteral = Parse.AnyChar
+            .Except(singleEscape).Except(delimiter).Many().Text().Named("Literal without escape/delimiter character");
+
+        public static readonly Parser<StringConstantEvaluator> StringLiteral = 
+            (from start in delimiter
+                             from v in Parse.Ref(()=> escapedDelimiter.Or(escapedDelimiter2).Or(doubleEscape).Or(singleEscape).Or(simpleLiteral)).Text().Many()
+                             from end in delimiter
+                             select new StringConstantEvaluator( string.Concat(v.Select(k=>k=="''" || k=="\\'" ?"'":k)) ));
 
         private static readonly Parser<StringConstantEvaluator> QuotedString =
             from open in DoubleQuote
@@ -87,11 +102,11 @@ namespace DotNETDevOps.JsonFunctions
             from close in DoubleQuote
             select new StringConstantEvaluator(text);
 
-        private static readonly Parser<StringConstantEvaluator> QuotedSingleString =
-           from open in SingleQuote
-           from text in QdText1.Many().Text()
-           from close in SingleQuote
-           select new StringConstantEvaluator(text);
+        //private static readonly Parser<StringConstantEvaluator> QuotedSingleString =
+        //   from open in SingleQuote
+        //   from text in QdText1.Many().Text()
+        //   from close in SingleQuote
+        //   select new StringConstantEvaluator(string.Join('\'',text));
 
        // public Dictionary<string, Func<JToken, JToken[], JToken>> Functions { get; set; } = new Dictionary<string, Func<JToken, JToken[], JToken>>();
 
@@ -117,7 +132,7 @@ namespace DotNETDevOps.JsonFunctions
                             Function
                             .Or(Number)
                             .Or(QuotedString)
-                            .Or(QuotedSingleString)
+                            .Or(Parse.Ref(()=> StringLiteral))
                             .Or(Constant)
                         )
                         .Or(ArrayIndexer)
