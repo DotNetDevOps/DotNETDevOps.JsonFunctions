@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
+using Sprache;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -89,6 +90,8 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             Functions["lookup"] = (_, __, ___) => Task.FromResult<JToken>(null);
             Functions["body"] = (_, __, ___) => Task.FromResult<JToken>(null);
             Functions["in"] = InExpressionFunction;
+            Functions["xpath"] = (_,__,___)=> Task.FromResult<JToken>(null);
+            Functions["concat"] = (_, __, ___) => Task.FromResult<JToken>(string.Join("",___.Select(c=>c.ToString())));
             payload = Payload;
         }
         private Task<JToken> InExpressionFunction(ExpressionParser<JToken> parser, JToken document, JToken[] arguments)
@@ -317,6 +320,68 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
 
         }
 
-        
+        [Fact]
+        public async Task Test12()
+        {
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+
+            var test = await ex.EvaluateAsync("[concat('test = ','another','')]");
+
+            Assert.Equal("test = another",test?.ToString());
+
+
+        }
+
+        [Fact]
+        public async Task Test13()
+        {
+            
+
+            //     Parser<IJTokenEvaluator> stringParser =                
+            //     from evaluator in ExpressionParser<object>.StringLiteral                 
+            //     select evaluator;
+
+            //var a = stringParser.Parse("'test\\'test\\''");
+
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+
+            var test = await ex.EvaluateAsync("[concat('test = ','''anot''her''','123')]");
+
+            Assert.Equal("test = 'anot'her'123", test?.ToString());
+
+
+        }
+        [Fact]
+        public async Task Test14()
+        {
+
+
+            //     Parser<IJTokenEvaluator> stringParser =                
+            //     from evaluator in ExpressionParser<object>.StringLiteral                 
+            //     select evaluator;
+
+            //var a = stringParser.Parse("'test\\'test\\''");
+
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+
+            var test = await ex.EvaluateAsync("[concat('test = ','\\'anot\\'her\\'','123')]");
+
+            Assert.Equal("test = 'anot'her'123", test?.ToString());
+
+
+        }
+
     }
 }
