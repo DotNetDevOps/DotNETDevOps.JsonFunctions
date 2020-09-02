@@ -91,6 +91,7 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             Functions["body"] = (_, __, ___) => Task.FromResult<JToken>(null);
             Functions["in"] = InExpressionFunction;
             Functions["xpath"] = (_,__,___)=> Task.FromResult<JToken>(null);
+            Functions["if"] = (_, __, ___) => Task.FromResult<JToken>(___[0].ToObject<bool>()?___[1]:___[2]);
             Functions["concat"] = (_, __, ___) => Task.FromResult<JToken>(string.Join("",___.Select(c=>c.ToString())));
             payload = Payload;
         }
@@ -240,23 +241,7 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
 
 
         }
-
-        [Fact]
-        public async Task Test7()
-        {
-            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
-            {
-                ThrowOnError = false,
-                Document = JToken.FromObject(new { variables = new { testvariable = new { test = new { nested = "b" } } } }),
-            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
-
-            var test = await ex.EvaluateAsync("[variables('testvariable')?['test2']?.nested]");
-
-            Assert.Null(test);
-
-           
-        }
-
+ 
         [Fact]
         public async Task Test8()
         {
@@ -379,6 +364,30 @@ namespace DotNETDevOps.JsonFunctions.UnitTests
             var test = await ex.EvaluateAsync("[concat('test = ','\\'anot\\'her\\'','123')]");
 
             Assert.Equal("test = 'anot'her'123", test?.ToString());
+
+
+        }
+
+        [Fact]
+        public async Task Test15()
+        {
+
+
+            //     Parser<IJTokenEvaluator> stringParser =                
+            //     from evaluator in ExpressionParser<object>.StringLiteral                 
+            //     select evaluator;
+
+            //var a = stringParser.Parse("'test\\'test\\''");
+
+            var ex = new ExpressionParser<JToken>(Options.Create(new ExpressionParserOptions<JToken>
+            {
+                ThrowOnError = false,
+
+            }), new log(), new ExpressionsEngine(Payload: "helloWorld"));
+
+            var test = await ex.EvaluateAsync("[if(true,null,'hello')]");
+
+            Assert.Equal(JTokenType.Null, test.Type);
 
 
         }
