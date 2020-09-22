@@ -3,8 +3,10 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using Sprache;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace DotNETDevOps.JsonFunctions
@@ -119,6 +121,8 @@ namespace DotNETDevOps.JsonFunctions
         private readonly IExpressionFunctionFactory<TContext> functions;
 
         public TContext Document => this.options.Value.Document;
+        public ExpressionParserOptions<TContext> Options => this.options.Value;
+
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
         public ExpressionParser(IOptions<ExpressionParserOptions<TContext>> options, ILogger logger, IExpressionFunctionFactory<TContext> functions)
@@ -249,7 +253,24 @@ namespace DotNETDevOps.JsonFunctions
             return null;
 
         }
+        private ConcurrentDictionary<string, ValueTask<JToken>> cache = new ConcurrentDictionary<string, ValueTask<JToken>>();
+        public static string CreateMD5(string input)
+        {
+            // Use input string to calculate MD5 hash
+            using (System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create())
+            {
+                byte[] inputBytes = System.Text.Encoding.ASCII.GetBytes(input);
+                byte[] hashBytes = md5.ComputeHash(inputBytes);
 
+                // Convert the byte array to hexadecimal string
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < hashBytes.Length; i++)
+                {
+                    sb.Append(hashBytes[i].ToString("x2"));
+                }
+                return sb.ToString();
+            }
+        }
         public async Task<JToken> EvaluateAsync(string name, params JToken[] arguments)
         {
             var function = functions.Get(name);
@@ -257,8 +278,13 @@ namespace DotNETDevOps.JsonFunctions
             {
                 throw new Exception($"{name} not found in functions");
             }
-           
 
+            if (options.Value.EnableFunctionEvaluationCaching && arguments.Any())
+            {
+                var key = CreateMD5($"{name}{string.Join("", arguments.Select(c => c?.ToString()))}");
+                return await cache.GetOrAdd(key, async (hash) => await function(this, Document, arguments));
+            }
+            
             var value =await function(this,Document, arguments);
 
 

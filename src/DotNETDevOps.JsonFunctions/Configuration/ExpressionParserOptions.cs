@@ -6,5 +6,6 @@ namespace DotNETDevOps.JsonFunctions
     {
         public bool ThrowOnError { get; set; } = true;
         public TContext Document { get; set; }
+        public bool EnableFunctionEvaluationCaching { get; set; } = false;
     }
 }
