@@ -125,6 +125,8 @@ namespace DotNETDevOps.JsonFunctions
 
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
+        private readonly ConcurrentDictionary<string, ValueTask<JToken>> cache = new ConcurrentDictionary<string, ValueTask<JToken>>();
+
         public ExpressionParser(IOptions<ExpressionParserOptions<TContext>> options, ILogger logger, IExpressionFunctionFactory<TContext> functions)
         {
             Constant = Parse.LetterOrDigit.AtLeastOnce().Text().Select(k => new ConstantEvaluator(k));
@@ -253,7 +255,7 @@ namespace DotNETDevOps.JsonFunctions
             return null;
 
         }
-        private ConcurrentDictionary<string, ValueTask<JToken>> cache = new ConcurrentDictionary<string, ValueTask<JToken>>();
+       
         public static string CreateMD5(string input)
         {
             // Use input string to calculate MD5 hash
@@ -281,7 +283,14 @@ namespace DotNETDevOps.JsonFunctions
 
             if (options.Value.EnableFunctionEvaluationCaching && arguments.Any())
             {
+                
                 var key = CreateMD5($"{name}{string.Join("", arguments.Select(c => c?.ToString()))}");
+
+                if(Options.Cache != null)
+                {
+                    return await Options.Cache.GetOrAdd(key, async (hash) => await function(this, Document, arguments));
+                }
+
                 return await cache.GetOrAdd(key, async (hash) => await function(this, Document, arguments));
             }
             
