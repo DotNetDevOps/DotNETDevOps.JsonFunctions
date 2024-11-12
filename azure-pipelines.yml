@@ -25,10 +25,10 @@ stages:
   jobs:
   - job: Build
     pool:
-      vmImage: 'windows-2019'
+      vmImage: 'windows-2022'
     variables:
       buildConfiguration: 'Release'
-      major: 3
+      major: 9
       minor: 0
       patch: $[counter(format('{0}.{1}',variables['major'],variables['minor']),1)]
       packageVersionType: ""
@@ -73,7 +73,7 @@ stages:
   - job: Build   
 
     pool:
-      vmImage: 'windows-2019'
+      vmImage: 'windows-2022'
     
     steps:
     - task: DownloadPipelineArtifact@1
@@ -108,7 +108,7 @@ stages:
   - job: Build    
 
     pool:
-      vmImage: 'windows-2019'
+      vmImage: 'windows-2022'
     
     steps:
     - task: DownloadPipelineArtifact@1
